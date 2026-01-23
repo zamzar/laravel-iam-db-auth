@@ -1,6 +1,0 @@
-[
-  {
-    "description": "Initial Release with Mysql Auth using AWS IAM Creds",
-    "type": "minor"
-  }
-]

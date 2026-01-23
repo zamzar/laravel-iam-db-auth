@@ -1,17 +1,17 @@
 <?php
 
-namespace Pixelvide\DBAuth\Database;
+namespace Zamzar\Laravel\Database\Iam\Connectors;
 
 use Exception;
-use Illuminate\Database\Connectors\MySqlConnector as DefaultMySqlConnector;
+use Illuminate\Database\Connectors\PostgresConnector as DefaultPostgresConnector;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 use PDO;
-use Pixelvide\DBAuth\Auth\RDSTokenProvider;
+use Zamzar\Laravel\Database\Iam\Auth\RDSTokenProvider;
 
-class MySqlConnector extends DefaultMySqlConnector
+class PostgresConnector extends DefaultPostgresConnector
 {
     /**
      * Create a new PDO Connection.
@@ -43,14 +43,14 @@ class MySqlConnector extends DefaultMySqlConnector
         $token_provider = new RDSTokenProvider($config);
         try {
             $password = $token_provider->getToken();
-            Log::debug('Connecting to db using IAM authentication');
+            Log::info('Connecting to db using auth token '.$password);
 
             return $this->createPdoConnection(
                 $dsn, $username, $password, $options
             );
         } catch (Exception $e) {
             $password = $token_provider->getToken(true);
-            Log::debug('Connecting to db using IAM authentication');
+            Log::info('Connecting to db using auth token '.$password);
 
             return $this->tryAgainIfCausedByLostConnectionOrBadToken(
                 $e, $dsn, $username, $password, $options

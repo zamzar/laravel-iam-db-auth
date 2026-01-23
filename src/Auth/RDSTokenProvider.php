@@ -1,6 +1,6 @@
 <?php
 
-namespace Pixelvide\DBAuth\Auth;
+namespace Zamzar\Laravel\Database\Iam\Auth;
 
 use Aws\Credentials\CredentialProvider;
 use Aws\Rds\AuthTokenGenerator;
