@@ -1,9 +1,8 @@
-## laravel-iam-db-auth
+# laravel-iam-db-auth
 
-This is a package to connect Laravel with a AWS RDS instance using IAM authentication.
+A Laravel package for connecting to an AWS RDS instance via IAM authentication.
 
-It includes a service provider that gives the framework our overridden MySQL/PGSQL connector class when it asks
-for an MySQL/PGSQL connection.
+It includes a service provider that gives the framework our overridden MySQL connector class when it asks for a MySQL connection.
 
 ## Installation
 
@@ -13,51 +12,30 @@ require this package with composer:
 composer require zamzar/laravel-iam-db-auth
 ```
 
-Add a missing variables in connection to the config array in config/database.php
+Add an `iam` block to your database config, with the following settings:
 
 ```php
-<?php [
     'mysql' => [
         'driver' => 'mysql',
+        'url' => env('DB_URL'),
         'host' => env('DB_HOST', '127.0.0.1'),
         'port' => env('DB_PORT', '3306'),
         'database' => env('DB_DATABASE', 'database_name'),
         'username' => env('DB_USERNAME', 'database_username'),
-        'password' => '',
-        'charset' => 'utf8mb4',
-        'collation' => 'utf8mb4_unicode_ci',
+        'password' => env('DB_PASSWORD', ''),
+        'unix_socket' => env('DB_SOCKET', ''),
+        'charset' => env('DB_CHARSET', 'utf8mb4'),
+        'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
         'prefix' => '',
-        'strict' => false,
+        'prefix_indexes' => true,
+        'strict' => true,
         'engine' => null,
-        'aws_region' => env('AWS_REGION'),
-        'use_iam_auth' => env('DB_USE_IAM_AUTH', true),
-        'options' => array(
-            'MYSQLI_READ_DEFAULT_FILE' => env('MYSQL_CNF_FILE', '/path/to/cnf/file'),
-            PDO::MYSQL_ATTR_SSL_CA    => base_path('vendor/pixelvide/laravel-iam-db-auth/certs/rds-ca-2019-root.pem'),
-        ),
-    ],
-];
+        'iam' => [
+            'use_iam_auth' => env('DB_USE_IAM_AUTH', false),
+            'aws_region' => env('DB_AWS_REGION', 'us-east-1'),
+            'cache_store' => env('DB_IAM_CACHE_STORE', 'file'),
+        ],
+        'options' => extension_loaded('pdo_mysql') ? array_filter([
+            PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+        ]) : [],
 ```
-
-
-```php
-<?php [
-    'pgsql' => [
-        'driver' => 'pgsql',
-        'host' => env('DB_HOST', '127.0.0.1'),
-        'port' => env('DB_PORT', '5432'),
-        'database' => env('DB_DATABASE', 'database_name'),
-        'username' => env('DB_USERNAME', 'database_username'),
-        'password' => '',
-        'charset' => 'utf8mb4',
-        'aws_region' => env('AWS_REGION'),
-        'use_iam_auth' => env('DB_USE_IAM_AUTH', true),
-        'options' => array(
-            PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),      
-        ),
-    ],
-];
-```
-
-Obtain the rds-combined-ca-bundle.pem from https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html
-
