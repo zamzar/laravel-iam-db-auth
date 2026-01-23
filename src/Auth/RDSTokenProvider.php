@@ -7,49 +7,48 @@ use Aws\Rds\AuthTokenGenerator;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 
-class RDSTokenProvider
+class RdsTokenProvider
 {
     /**
-     * AWS configuration values
-     *
-     * @var Array
+     * @var array
      */
     protected $config;
 
     /**
      * @var AuthTokenGenerator
      */
-    private $rds_auth_generator;
+    protected $authTokenGenerator;
 
     /**
-     * Class constructor
-     *
-     * @param  Array - AWS configuration
-     * @return Void
+     * @var \Illuminate\Cache\Repository
      */
+    protected $cache;
+
     public function __construct(array $config)
     {
         $this->config = $config;
+        $this->cache = Cache::store(Arr::get($config, 'iam.cache_store'));
         $provider = CredentialProvider::defaultProvider();
-        $this->rds_auth_generator = new AuthTokenGenerator($provider);
+        $this->authTokenGenerator = new AuthTokenGenerator($provider);
     }
 
     /**
-     * Get the DBs Auth token from the AWS Auth Token Generator
+     * Retrieve an auth token from the AWS Auth Token Generator
      *
-     * @param  Bool - Force refetch of cached token
-     * @return String - Auth token
+     * @param  bool $refetch Force refetch of cached token
+     * @return string
      */
-    public function getToken($refetch = false)
+    public function getToken(bool $refetch = false): string
     {
         if ($refetch) {
-            Cache::forget('db_token');
+            $this->cache->forget('db_iam_token');
         }
-        
-        return Cache::remember('db_token', 10, function () {
-            return $this->rds_auth_generator->createToken(
-                Arr::get($this->config, 'host').':'.Arr::get($this->config, 'port'),
-                Arr::get($this->config, 'aws_region'),
+
+        // Cache the token for 10 minutes (600 seconds) - max lifetime is 15 minutes
+        return $this->cache->remember('db_iam_token', 600, function () {
+            return $this->authTokenGenerator->createToken(
+                Arr::get($this->config, 'host') . ':' . Arr::get($this->config, 'port'),
+                Arr::get($this->config, 'iam.aws_region'),
                 Arr::get($this->config, 'username')
             );
         });

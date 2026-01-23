@@ -3,54 +3,41 @@
 namespace Zamzar\Laravel\Database\Iam\Connectors;
 
 use Exception;
-use Illuminate\Database\Connectors\MySqlConnector as DefaultMySqlConnector;
+use Illuminate\Database\Connectors\MySqlConnector as Connector;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use InvalidArgumentException;
 use PDO;
-use Zamzar\Laravel\Database\Iam\Auth\RDSTokenProvider;
+use Throwable;
+use Zamzar\Laravel\Database\Iam\Auth\RdsTokenProvider;
 
-class MySqlConnector extends DefaultMySqlConnector
+class MySqlConnector extends Connector
 {
     /**
-     * Create a new PDO Connection.
+     * Create a new PDO connection.
      *
      * @param  string  $dsn
      * @param  array  $config
      * @param  array  $options
+     * @return \PDO
      *
-     * @return PDO
-     *
-     * @throws InvalidArgumentException when aws profile is not supplied
+     * @throws \Exception
      */
     public function createConnection($dsn, array $config, array $options)
     {
-        if (!(Arr::has($config, 'use_iam_auth')) || !(Arr::get($config, 'use_iam_auth'))) {
+        if (!(Arr::get($config, 'iam.use_iam_auth'))) {
             return parent::createConnection($dsn, $config, $options);
         }
 
-        [$username] = [
-            Arr::get($config, 'username'),
-        ];
+        $tokenProvider = new RdsTokenProvider($config);
+        $username = Arr::get($config, 'username');
+        $password = $tokenProvider->getToken();
 
-        /*
-        if (!(Arr::has($config, 'aws_profile'))) {
-            throw new InvalidArgumentException('An AWS Profile must be specified.');
-        }
-        */
-
-        $token_provider = new RDSTokenProvider($config);
         try {
-            $password = $token_provider->getToken();
-            Log::debug('Connecting to db using IAM authentication');
-
             return $this->createPdoConnection(
                 $dsn, $username, $password, $options
             );
         } catch (Exception $e) {
-            $password = $token_provider->getToken(true);
-            Log::debug('Connecting to db using IAM authentication');
+            $password = $tokenProvider->getToken(true);
 
             return $this->tryAgainIfCausedByLostConnectionOrBadToken(
                 $e, $dsn, $username, $password, $options
@@ -61,22 +48,23 @@ class MySqlConnector extends DefaultMySqlConnector
     /**
      * Handle an exception that occurred during connect execution.
      *
-     * @param  Exception  $e
+     * @param  \Throwable  $e
      * @param  string  $dsn
      * @param  string  $username
      * @param  string  $password
-     * @param  array   $options
-     * @return PDO
+     * @param  array  $options
+     * @return \PDO
      *
-     * @throws Exception
+     * @throws \Throwable
      */
-    protected function tryAgainIfCausedByLostConnectionOrBadToken(Exception $e, $dsn, $username, $password, $options)
-    {
-        if ($this->causedByLostConnection($e)) {
-            return $this->createPdoConnection($dsn, $username, $password, $options);
-        }
-
-        if ($this->causedByLostConnectionOrBadToken($e)) {
+    protected function tryAgainIfCausedByLostConnectionOrBadToken(
+        Throwable $e,
+        $dsn,
+        $username,
+        $password,
+        $options
+    ) {
+        if ($this->causedByLostConnection($e) || $this->causedByBadToken($e)) {
             return $this->createPdoConnection($dsn, $username, $password, $options);
         }
 
@@ -84,28 +72,15 @@ class MySqlConnector extends DefaultMySqlConnector
     }
 
     /**
-     * Determine if the given exception was caused by a lost connection or bad auth token
+     * Determine if the given exception was caused by a bad auth token
      *
      * @param  Exception  $e
      * @return bool
      */
-    protected function causedByLostConnectionOrBadToken(Exception $e)
+    protected function causedByBadToken(Exception $e)
     {
         $message = $e->getMessage();
 
-        return Str::contains($message, [
-            'server has gone away',
-            'no connection to the server',
-            'Lost connection',
-            'is dead or not enabled',
-            'Error while sending',
-            'decryption failed or bad record mac',
-            'server closed the connection unexpectedly',
-            'SSL connection has been closed unexpectedly',
-            'Error writing data to the connection',
-            'Resource deadlock avoided',
-            'Transaction() on null',
-            'Access denied'
-        ]);
+        return Str::contains($message, 'Access denied');
     }
 }
